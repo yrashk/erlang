@@ -476,9 +476,11 @@ call_type(#c_literal{val=M}, #c_literal{val=F}, Ar) when is_atom(M), is_atom(F) 
 	false -> call;
 	true -> bif
     end;
+call_type(#c_literal{val=M}, #c_literal{val=F}, Ar) when is_tuple(M), is_atom(F) -> old_apply;
 call_type(#c_var{}, #c_literal{val=A}, _) when is_atom(A) -> apply;
 call_type(#c_literal{val=A}, #c_var{}, _) when is_atom(A) -> apply;
 call_type(#c_var{}, #c_var{}, _) -> apply;
+call_type(#c_tuple{}, _, _) -> apply;
 call_type(_, _, _) -> error.
 
 %% match_vars(Kexpr, State) -> {[Kvar],[PreKexpr],State}.
