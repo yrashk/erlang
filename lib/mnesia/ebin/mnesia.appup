@@ -1,0 +1,13 @@
+%% -*- erlang -*-
+{"4.4.10",  
+ [
+  {"4.4.9", [{restart_application, mnesia}]},
+  {"4.4.8", [{restart_application, mnesia}]},
+  {"4.4.7", [{restart_application, mnesia}]}
+ ],
+ [
+  {"4.4.9", [{restart_application, mnesia}]},
+  {"4.4.8", [{restart_application, mnesia}]},
+  {"4.4.7", [{restart_application, mnesia}]}
+ ]
+}.
