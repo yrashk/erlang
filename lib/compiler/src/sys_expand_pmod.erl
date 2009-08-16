@@ -99,8 +99,8 @@ clause({clause,Line,H0,G0,B0},St) ->
 emit_clause(L,H,G,B,St, original) ->
     T = {tuple,L,[{var,L,V} || V <- ['_'|St#pmod.parameters]]},
     [{clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B}];
-emit_clause(L,H,G,B,#pmod{parameters=['BASE'|_]}=St, pmod_allow_base_omittance) when St#pmod.pmod_allow_base_omittance == true ->
-    T = {tuple,L,[{var,L,V} || V <- ['_'|tl(St#pmod.parameters)]]},
+emit_clause(L,H,G,B,#pmod{parameters=['BASE'|P]}=St, pmod_allow_base_omittance) when St#pmod.pmod_allow_base_omittance == true ->
+    T = {tuple,L,[{var,L,V} || V <- ['_'|P]]},
     [{clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B}];
 emit_clause(_L,_H,_G,_B,_St, pmod_allow_base_omittance) ->
     [];
@@ -114,7 +114,7 @@ emit_clause(_L,_H,_G,_B,_St, pmod_allow_catch_all_functions) ->
     [].
 
 
-guard_subst_undefined({var, L, Guard}, L, [Guard|T]) when is_atom(Guard) ->
+guard_subst_undefined({var, L, Guard}, L, [Guard|_]) when is_atom(Guard) ->
     {atom, L, undefined};
 guard_subst_undefined({var, L, Guard}, L, [_H|T]) when is_atom(Guard) ->
     guard_subst_undefined({var, L, Guard}, L, T);
