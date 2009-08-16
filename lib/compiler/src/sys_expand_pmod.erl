@@ -87,8 +87,22 @@ function(Name, Arity, Clauses0, St) ->
 
 clauses([C|Cs],St) ->
     {clause,L,H,G,B} = clause(C,St),
+       NoBaseParameters = case basep(St#pmod.parameters) of true -> tl(St#pmod.parameters); false -> St#pmod.parameters end,
     T = {tuple,L,[{var,L,V} || V <- ['_'|St#pmod.parameters]]},
-    [{clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B}|clauses(Cs,St)];
+    TNB = {tuple,L,[{var,L,V} || V <- ['_'|NoBaseParameters]]},
+    VA = {match, L,
+          {tuple, L, [ {var, L, V} || V <- St#pmod.parameters]},
+          {tuple, L, [ {atom, L, undefined} || _V <- St#pmod.parameters]}},
+    G1 = guard_subst_undefined(G, L, St#pmod.parameters),
+    Clause_Original = {clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B},
+    Clause_NoBase = {clause,L,H++[{match,L,TNB,{var,L,'THIS'}}],G,B},
+    Clause_Rest = {clause,L,H++[{var,L,'THIS'}],G1,[VA|B]},
+    case basep(St#pmod.parameters) of
+         true ->
+              [Clause_Original,Clause_NoBase,Clause_Rest|clauses(Cs,St)];
+         false ->
+              [Clause_Original,Clause_Rest|clauses(Cs,St)]
+    end;
 clauses([],_St) -> [].
 
 clause({clause,Line,H0,G0,B0},St) ->
@@ -96,6 +110,27 @@ clause({clause,Line,H0,G0,B0},St) ->
     G1 = guard(G0,St),
     B1 = exprs(B0,St),
     {clause,Line,H1,G1,B1}.
+
+
+basep(['BASE'|_]) ->
+    true;
+basep(_) ->
+    false.
+guard_subst_undefined({var, L, Guard}, L, [Guard|T]) when is_atom(Guard) ->
+    {atom, L, undefined};
+guard_subst_undefined({var, L, Guard}, L, [_H|T]) when is_atom(Guard) ->
+    guard_subst_undefined({var, L, Guard}, L, T);
+guard_subst_undefined({var, L, Guard}, L, []) when is_atom(Guard) ->
+    {var, L, Guard};
+guard_subst_undefined(Guard, L, Pars) when is_tuple(Guard) ->
+    list_to_tuple(guard_subst_undefined(tuple_to_list(Guard), L, Pars));
+guard_subst_undefined([H|T], L, Pars) ->
+    [guard_subst_undefined(H, L, Pars)|guard_subst_undefined(T, L, Pars)];
+guard_subst_undefined([], _L, _Pars) ->
+    [];
+guard_subst_undefined(Guard, _L, _Pars) ->
+    Guard.
+
 
 head(Ps,St) -> patterns(Ps,St).
 
