@@ -26,18 +26,18 @@
 %% and 'exports'. The automatic 'new/N' function is neither added to the
 %% definitions nor to the 'exports'/'defines' lists yet.
 
--export([forms/4]).
+-export([forms/5]).
 
--record(pmod, {parameters, exports, defined, predef}).
+-record(pmod, {parameters, exports, defined, predef, pmod_allow_base_omittance, pmod_allow_catch_all_functions}).
 
 %% TODO: more abstract handling of predefined/static functions.
 
-forms(Fs0, Ps, Es0, Ds0) ->
+forms(Fs0, Ps, Es0, Ds0, Compile) ->
     PreDef = [{module_info,0},{module_info,1}],
-    forms(Fs0, Ps, Es0, Ds0, PreDef).
+    forms(Fs0, Ps, Es0, Ds0, Compile, PreDef).
 
-forms(Fs0, Ps, Es0, Ds0, PreDef) ->
-    St0 = #pmod{parameters=Ps,exports=Es0,defined=Ds0, predef=PreDef},
+forms(Fs0, Ps, Es0, Ds0, Compile, PreDef) ->
+    St0 = #pmod{parameters=Ps,exports=Es0,defined=Ds0, predef=PreDef, pmod_allow_base_omittance=lists:member(pmod_allow_base_omittance,Compile), pmod_allow_catch_all_functions=lists:member(pmod_allow_catch_all_functions,Compile)},
     {Fs1, St1} = forms(Fs0, St0),
     Es1 = update_function_names(Es0, St1),
     Ds1 = update_function_names(Ds0, St1),
@@ -87,22 +87,7 @@ function(Name, Arity, Clauses0, St) ->
 
 clauses([C|Cs],St) ->
     {clause,L,H,G,B} = clause(C,St),
-       NoBaseParameters = case basep(St#pmod.parameters) of true -> tl(St#pmod.parameters); false -> St#pmod.parameters end,
-    T = {tuple,L,[{var,L,V} || V <- ['_'|St#pmod.parameters]]},
-    TNB = {tuple,L,[{var,L,V} || V <- ['_'|NoBaseParameters]]},
-    VA = {match, L,
-          {tuple, L, [ {var, L, V} || V <- St#pmod.parameters]},
-          {tuple, L, [ {atom, L, undefined} || _V <- St#pmod.parameters]}},
-    G1 = guard_subst_undefined(G, L, St#pmod.parameters),
-    Clause_Original = {clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B},
-    Clause_NoBase = {clause,L,H++[{match,L,TNB,{var,L,'THIS'}}],G,B},
-    Clause_Rest = {clause,L,H++[{var,L,'THIS'}],G1,[VA|B]},
-    case basep(St#pmod.parameters) of
-         true ->
-              [Clause_Original,Clause_NoBase,Clause_Rest|clauses(Cs,St)];
-         false ->
-              [Clause_Original,Clause_Rest|clauses(Cs,St)]
-    end;
+    emit_clause(L,H,G,B,St, original) ++ emit_clause(L,H,G,B,St, pmod_allow_base_omittance) ++ emit_clause(L,H,G,B,St, pmod_allow_catch_all_functions)++ clauses(Cs,St);
 clauses([],_St) -> [].
 
 clause({clause,Line,H0,G0,B0},St) ->
@@ -111,11 +96,24 @@ clause({clause,Line,H0,G0,B0},St) ->
     B1 = exprs(B0,St),
     {clause,Line,H1,G1,B1}.
 
+emit_clause(L,H,G,B,St, original) ->
+    T = {tuple,L,[{var,L,V} || V <- ['_'|St#pmod.parameters]]},
+    [{clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B}];
+emit_clause(L,H,G,B,#pmod{parameters=['BASE'|_]}=St, pmod_allow_base_omittance) when St#pmod.pmod_allow_base_omittance == true ->
+    T = {tuple,L,[{var,L,V} || V <- ['_'|tl(St#pmod.parameters)]]},
+    [{clause,L,H++[{match,L,T,{var,L,'THIS'}}],G,B}];
+emit_clause(_L,_H,_G,_B,_St, pmod_allow_base_omittance) ->
+    [];
+emit_clause(L,H,G,B,St, pmod_allow_catch_all_functions) when St#pmod.pmod_allow_catch_all_functions == true->
+    VA = {match, L,
+      {tuple, L, [ {var, L, V} || V <- St#pmod.parameters]},
+      {tuple, L, [ {atom, L, undefined} || _V <- St#pmod.parameters]}},
+    G1 = guard_subst_undefined(G, L, St#pmod.parameters),
+    [{clause,L,H++[{var,L,'THIS'}],G1,[VA|B]}];
+emit_clause(_L,_H,_G,_B,_St, pmod_allow_catch_all_functions) ->
+    [].
 
-basep(['BASE'|_]) ->
-    true;
-basep(_) ->
-    false.
+
 guard_subst_undefined({var, L, Guard}, L, [Guard|T]) when is_atom(Guard) ->
     {atom, L, undefined};
 guard_subst_undefined({var, L, Guard}, L, [_H|T]) when is_atom(Guard) ->
