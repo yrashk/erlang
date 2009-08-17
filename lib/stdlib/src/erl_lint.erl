@@ -2891,8 +2891,14 @@ pat_binsize_var(V, Line, Vt, Bvt, St) ->
 expr_var(V, Line, Vt, St0) ->
     case orddict:find(V, Vt) of
         {ok,{bound,_Usage,Ls}} -> 
-            {[{V,{bound,used,Ls}}],St0};
-        {ok,{{unsafe,In},_Usage,Ls}} ->
+            case element(1,St0#lint.func) == new andalso lists:keymember(V,1,St0#lint.global_vt) of
+                 true -> 
+                    {[{V,{bound,used,[Line]}}],
+                          add_error(Line, {unbound_var,V}, St0)};
+                 false ->
+                    {[{V,{bound,used,Ls}}],St0}
+            end;
+        {ok,{{unsafe,In},Usage,Ls}} ->
             {[{V,{bound,used,Ls}}],
              add_error(Line, {unsafe_var,V,In}, St0)};
         {ok,{{export,From},_Usage,Ls}} ->
