@@ -2891,7 +2891,7 @@ pat_binsize_var(V, Line, Vt, Bvt, St) ->
 expr_var(V, Line, Vt, St0) ->
     case orddict:find(V, Vt) of
         {ok,{bound,_Usage,Ls}} -> 
-            case element(1,St0#lint.func) == new andalso lists:keymember(V,1,St0#lint.global_vt) of
+            case is_tuple(St0#lint.func) andalso element(1,St0#lint.func) == new andalso lists:keymember(V,1,St0#lint.global_vt) of
                  true -> 
                     {[{V,{bound,used,[Line]}}],
                           add_error(Line, {unbound_var,V}, St0)};
